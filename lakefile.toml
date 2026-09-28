@@ -16,3 +16,8 @@ rev = "v4.28.0"
 
 [[lean_lib]]
 name = "Hilbert17thProblem"
+
+[[require]]
+name = "LeanArchitect"
+git = "https://github.com/hanwenzhu/LeanArchitect.git"
+rev = "v4.28.0"
