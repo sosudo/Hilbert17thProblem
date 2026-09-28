@@ -91,6 +91,15 @@ theorem neg_one_notMem_closure_insert_or
   ring_nf at this ⊢
   exact this
 
+theorem exists_le_preordering_and_mem_or_mem
+    (P : RingPreordering R) {x y : R} (hxy : -(x * y) ∈ P) :
+    ∃ Q : RingPreordering R, P ≤ Q ∧ (x ∈ Q ∨ y ∈ Q) := by
+  rcases neg_one_notMem_closure_insert_or P hxy with h | h
+  · exact ⟨preorderingOfClosure P x h, le_preorderingOfClosure P x h,
+      Or.inl (mem_preorderingOfClosure_insert P x h)⟩
+  · exact ⟨preorderingOfClosure P y h, le_preorderingOfClosure P y h,
+      Or.inr (mem_preorderingOfClosure_insert P y h)⟩
+
 /-- Construct a bundled preordering whose carrier is a specified subsemiring. -/
 def preorderingOfSubsemiring
     (S : Subsemiring R)
@@ -145,6 +154,17 @@ theorem exists_maximal_preordering
       exact ⟨Q, le_trans (hC hy) (hQ y hy), fun z hz => hQ z hz⟩)
     P (Set.mem_setOf_eq.mpr le_rfl)
   exact ⟨hzorn.choose, hzorn.choose_spec.1, hzorn.choose_spec.2⟩
+
+/-- A preordering maximal above `P` is an ordering. -/
+theorem isOrdering_of_maximal_preordering
+    {P O : RingPreordering R} (hPO : P ≤ O)
+    (hmax : Maximal (fun Q => P ≤ Q) O) : O.IsOrdering := by
+  rw [RingPreordering.isOrdering_iff]
+  intro a b hab
+  rcases exists_le_preordering_and_mem_or_mem O hab with ⟨Q, hOQ, hab⟩
+  rcases hab with ha | hb
+  · exact Or.inl ((hmax.2 (le_trans hPO hOQ) hOQ) ha)
+  · exact Or.inr ((hmax.2 (le_trans hPO hOQ) hOQ) hb)
 
 end
 
