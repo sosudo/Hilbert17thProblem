@@ -439,4 +439,99 @@ theorem isSemireal_mvFractionRing (n : ℕ) :
 
 end FractionRingField
 
+
+section RealClosed
+
+open Filter Polynomial Set in
+/-- Every real polynomial of odd degree has a real root, by the intermediate value theorem. -/
+theorem exists_isRoot_of_odd_natDegree_real {f : ℝ[X]} (hodd : Odd f.natDegree) :
+    ∃ x : ℝ, f.IsRoot x := by
+  have hpos : 0 < f.natDegree := by
+    obtain ⟨k, hk⟩ := hodd
+    omega
+  have hdegree : 0 < f.degree := natDegree_pos_iff_degree_pos.mp hpos
+  have hne : f ≠ 0 := f.ne_zero_of_natDegree_gt hpos
+  have hlead0 : f.leadingCoeff ≠ 0 := f.leadingCoeff_ne_zero.mpr hne
+  have hc : Continuous (fun x : ℝ => f.eval x) := f.continuous
+  have hcompdeg : (f.comp (-X)).degree = f.degree := degree_comp_neg_X
+  have hcomplead : (f.comp (-X)).leadingCoeff = (-1) ^ f.natDegree * f.leadingCoeff :=
+    comp_neg_X_leadingCoeff_eq f
+  rw [Odd.neg_one_pow hodd] at hcomplead
+  rcases lt_or_ge f.leadingCoeff 0 with hlead | hlead
+  · -- At `+∞` the polynomial is negative, while at `-∞` it is positive.
+    have hright : Tendsto (fun x : ℝ => f.eval x) atTop atBot :=
+      f.tendsto_atBot_of_leadingCoeff_nonpos hdegree hlead.le
+    have hleft : Tendsto (fun x : ℝ => f.eval x) atBot atTop := by
+      have hbase : Tendsto (fun x : ℝ => (f.comp (-X)).eval x) atTop atTop :=
+        (f.comp (-X)).tendsto_atTop_of_leadingCoeff_nonneg (hcompdeg ▸ hdegree)
+          (by rw [hcomplead]; simpa using le_of_lt (neg_pos.mpr hlead))
+      have hcomp := hbase.comp tendsto_neg_atBot_atTop
+      convert hcomp using 1
+      funext x
+      simp [eval_comp]
+    obtain ⟨B, hB⟩ := eventually_atBot.1 (hleft.eventually_gt_atTop 0)
+    obtain ⟨A, hA⟩ := eventually_atTop.1 (hright.eventually_lt_atBot 0)
+    set C := max (A + 1) (B + 1) with hC
+    have hBC : B < C := by
+      rw [hC]
+      by_cases hcase : A + 1 ≤ B + 1
+      · rw [max_eq_right hcase]; linarith
+      · rw [max_eq_left (by linarith)]; linarith
+    have hAC : A < C := by
+      rw [hC]
+      by_cases hcase : A + 1 ≤ B + 1
+      · rw [max_eq_right hcase]; linarith
+      · rw [max_eq_left (by linarith)]; linarith
+    have hB0 : 0 < f.eval B := hB B (by linarith)
+    have hC0 : f.eval C < 0 := hA C hAC.le
+    have hmem : (0:ℝ) ∈ Icc (f.eval C) (f.eval B) := by
+      constructor <;> [exact le_of_lt hC0; exact le_of_lt hB0]
+    have him := intermediate_value_Icc' hBC.le hc.continuousOn hmem
+    obtain ⟨c, _, hceq⟩ := him
+    exact ⟨c, hceq⟩
+  · -- At `+∞` the polynomial is positive, while at `-∞` it is negative.
+    have hright : Tendsto (fun x : ℝ => f.eval x) atTop atTop :=
+      f.tendsto_atTop_of_leadingCoeff_nonneg hdegree hlead
+    have hleft : Tendsto (fun x : ℝ => f.eval x) atBot atBot := by
+      have hbase : Tendsto (fun x : ℝ => (f.comp (-X)).eval x) atTop atBot :=
+        (f.comp (-X)).tendsto_atBot_of_leadingCoeff_nonpos (hcompdeg ▸ hdegree)
+          (by rw [hcomplead]
+              simpa using le_of_lt (neg_neg_iff_pos.mpr (lt_of_le_of_ne hlead
+                (fun h => hlead0 h.symm))))
+      have hcomp := hbase.comp tendsto_neg_atBot_atTop
+      convert hcomp using 1
+      funext x
+      simp [eval_comp]
+    obtain ⟨B, hB⟩ := eventually_atBot.1 (hleft.eventually_lt_atBot 0)
+    obtain ⟨A, hA⟩ := eventually_atTop.1 (hright.eventually_gt_atTop 0)
+    set C := max (A + 1) (B + 1) with hC
+    have hBC : B < C := by
+      rw [hC]
+      by_cases hcase : A + 1 ≤ B + 1
+      · rw [max_eq_right hcase]; linarith
+      · rw [max_eq_left (by linarith)]; linarith
+    have hAC : A < C := by
+      rw [hC]
+      by_cases hcase : A + 1 ≤ B + 1
+      · rw [max_eq_right hcase]; linarith
+      · rw [max_eq_left (by linarith)]; linarith
+    have hB0 : f.eval B < 0 := hB B (by linarith)
+    have hC0 : 0 < f.eval C := hA C hAC.le
+    have hmem : (0:ℝ) ∈ Icc (f.eval B) (f.eval C) := by
+      constructor <;> [exact le_of_lt hB0; exact le_of_lt hC0]
+    have him := intermediate_value_Icc hBC.le hc.continuousOn hmem
+    obtain ⟨c, _, hceq⟩ := him
+    exact ⟨c, hceq⟩
+
+/-- The real numbers form a real-closed field in the `IsRealClosed` hierarchy. -/
+instance : IsRealClosed ℝ :=
+  IsRealClosed.of_linearOrderedField
+    (fun (hx : 0 ≤ (_ : ℝ)) => ⟨Real.sqrt _, by
+      have h := Real.sq_sqrt hx
+      rw [pow_two] at h
+      exact h.symm⟩)
+    (fun hf => exists_isRoot_of_odd_natDegree_real hf)
+
+end RealClosed
+
 end Hilbert17thProblem
