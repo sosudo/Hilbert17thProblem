@@ -185,6 +185,8 @@ theorem isOrdering_of_maximal_preordering
   · exact Or.inl ((hmax.2 (le_trans hPO hOQ) hOQ) ha)
   · exact Or.inr ((hmax.2 (le_trans hPO hOQ) hOQ) hb)
 
+
+
 instance ringConeClass {F : Type*} [Field F] :
     RingConeClass (RingPreordering F) F where
   zero_mem := fun {_} => Subsemiring.zero_mem _
@@ -261,6 +263,24 @@ theorem exists_isOrdering_and_mem
   exact ⟨Q, le_trans (le_preorderingOfClosure P a h) hPQ,
     isOrdering_of_maximal_preordering hPQ hQmax,
     hPQ (mem_preorderingOfClosure_insert P a h)⟩
+
+open scoped Classical in
+/-- The canonical preordering of sums of squares in a semireal field. -/
+noncomputable def sumSqPreordering {F : Type*} [Field F] [IsSemireal F] :
+    RingPreordering F :=
+  RingPreordering.mk' {x | IsSumSq x}
+    (by intro x y hx hy; exact hx.add hy)
+    (by intro x y hx hy; exact hx.mul hy)
+    (by intro x; exact IsSumSq.mul_self x)
+    (by intro h; exact absurd h (isSemireal_iff_not_isSumSq_neg_one.mp inferInstance))
+
+/-- If `a` is not a sum of squares, there is a field ordering in which `-a` is positive. -/
+theorem exists_isOrdering_and_neg_mem {F : Type*} [Field F] [IsSemireal F]
+    {a : F} (ha : a ∉ sumSqPreordering) :
+    ∃ O : RingPreordering F, O.IsOrdering ∧ -a ∈ O := by
+  have hn : -(-a) ∉ sumSqPreordering := by simpa [neg_neg] using ha
+  obtain ⟨O, _, hO, hmem⟩ := exists_isOrdering_and_mem sumSqPreordering hn
+  exact ⟨O, hO, hmem⟩
 
 end
 
