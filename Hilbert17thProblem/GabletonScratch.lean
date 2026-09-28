@@ -185,6 +185,59 @@ theorem isOrdering_of_maximal_preordering
   · exact Or.inl ((hmax.2 (le_trans hPO hOQ) hOQ) ha)
   · exact Or.inr ((hmax.2 (le_trans hPO hOQ) hOQ) hb)
 
+instance ringConeClass {F : Type*} [Field F] :
+    RingConeClass (RingPreordering F) F where
+  zero_mem := fun {_} => Subsemiring.zero_mem _
+  one_mem := fun {_} => Subsemiring.one_mem _
+  add_mem := fun ha hb => Subsemiring.add_mem _ ha hb
+  mul_mem := fun ha hb => Subsemiring.mul_mem _ ha hb
+  eq_zero_of_mem_of_neg_mem := fun ha hb =>
+    RingPreordering.eq_zero_of_mem_of_neg_mem ha hb
+
+open scoped Classical in
+/-- Construct the linear order whose positive cone is a field ordering. -/
+noncomputable def linearOrderOfOrdering {F : Type*} [Field F]
+    (O : RingPreordering F) [O.IsOrdering] : LinearOrder F :=
+  LinearOrder.mkOfAddGroupCone O
+
+theorem order_mem_iff {F : Type*} [Field F] (O : RingPreordering F) [O.IsOrdering]
+    (a b : F) : @LE.le F (linearOrderOfOrdering O).toLE a b ↔ b - a ∈ O := by
+  constructor
+  · intro h
+    simpa [linearOrderOfOrdering] using
+      (PartialOrder.mkOfAddGroupCone_le_iff (C := O) (a := a) (b := b)).mp h
+  · intro h
+    simpa [linearOrderOfOrdering] using
+      (PartialOrder.mkOfAddGroupCone_le_iff (C := O) (a := a) (b := b)).mpr h
+
+open scoped Classical in
+/-- The linear order induced by a field ordering makes the field strictly ordered. -/
+theorem isStrictOrderedRing_ofOrdering {F : Type*} [Field F]
+    (O : RingPreordering F) [O.IsOrdering] :
+    letI : LinearOrder F := linearOrderOfOrdering O
+    IsStrictOrderedRing F := by
+  letI inst : LinearOrder F := linearOrderOfOrdering O
+  haveI : IsOrderedAddMonoid F := IsOrderedAddMonoid.mkOfCone O
+  haveI : ZeroLEOneClass F :=
+    ⟨order_mem_iff O 0 1 |>.mpr (by simp)⟩
+  apply IsStrictOrderedRing.of_mul_pos
+  intro x y hx hy
+  have hx' : x ∈ O := by
+    simpa [sub_eq_zero] using order_mem_iff O 0 x |>.mp hx.le
+  have hy' : y ∈ O := by
+    simpa [sub_eq_zero] using order_mem_iff O 0 y |>.mp hy.le
+  have hxy : x * y ∈ O := O.mul_mem hx' hy'
+  have hle : 0 ≤ x * y := by
+    simpa [sub_eq_zero] using
+      (order_mem_iff O 0 (x * y)).mpr (by simpa using hxy)
+  rcases eq_or_ne (x * y) 0 with h0 | h0
+  · exact absurd h0 (by
+      intro h0
+      rcases mul_eq_zero.mp h0 with hx0 | hy0
+      · exact lt_irrefl 0 (hx0 ▸ hx)
+      · exact lt_irrefl 0 (hy0 ▸ hy))
+  · exact hle.lt_of_ne (Ne.symm h0)
+
 /-- Every preordering on a field extends to a maximal preordering containing `a` whenever
 `-a ∉ P`. The maximality is among preorderings above the generated preordering. -/
 theorem exists_maximal_preordering_and_mem
