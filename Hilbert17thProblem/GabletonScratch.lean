@@ -284,4 +284,159 @@ theorem exists_isOrdering_and_neg_mem {F : Type*} [Field F] [IsSemireal F]
 
 end
 
+open scoped Classical in
+/-- A nonzero real multivariate polynomial has a real point where it does not vanish. -/
+theorem exists_eval_ne_zero {n : ℕ} {p : MvPolynomial (Fin n) ℝ} (hp : p ≠ 0) :
+    ∃ x : Fin n → ℝ, MvPolynomial.eval x p ≠ 0 := by
+  by_contra hcon
+  have hall : ∀ x : Fin n → ℝ, MvPolynomial.eval x p = 0 := by
+    intro x
+    by_contra hx
+    exact hcon ⟨x, hx⟩
+  exact hp (MvPolynomial.funext (q := 0) hall)
+
+section FractionRingField
+
+/-- A fraction in `FractionRing (MvPolynomial (Fin n) ℝ)` can be represented using a
+polynomial numerator and a nonzero polynomial denominator. -/
+theorem denom_mvFraction {n : ℕ} (x : FractionRing (MvPolynomial (Fin n) ℝ)) :
+    ∃ a b : MvPolynomial (Fin n) ℝ, b ≠ 0 ∧
+      x * algebraMap (MvPolynomial (Fin n) ℝ)
+          (FractionRing (MvPolynomial (Fin n) ℝ)) b =
+        algebraMap (MvPolynomial (Fin n) ℝ)
+          (FractionRing (MvPolynomial (Fin n) ℝ)) a := by
+  obtain ⟨p, hp⟩ :=
+    IsLocalization.surj (nonZeroDivisors (MvPolynomial (Fin n) ℝ)) x
+  exact ⟨p.1, p.2.1, mem_nonZeroDivisors_iff_ne_zero.mp p.2.2, hp⟩
+
+/-- Convert the inductively defined `IsSumSq` predicate to an explicitly indexed finite sum. -/
+theorem isSumSq_iff_exists_fin {R : Type*} [CommSemiring R] {x : R} :
+    IsSumSq x ↔ ∃ m : ℕ, ∃ f : Fin m → R, x = ∑ i : Fin m, (f i) ^ 2 := by
+  constructor
+  · intro h
+    induction h using IsSumSq.rec' with
+    | zero => exact ⟨0, Fin.elim0, by simp⟩
+    | @sq_add a s ht hs ih =>
+        obtain ⟨a, rfl⟩ := ht
+        obtain ⟨m, f, hf⟩ := ih
+        refine ⟨m + 1, Fin.cases a f, ?_⟩
+        rw [Fin.sum_univ_succ]
+        simp [pow_two, hf]
+  · rintro ⟨m, f, rfl⟩
+    exact IsSumSq.sum_sq Finset.univ f
+
+/-- The rational function field in finitely many real variables is formally real:
+`-1` is not a sum of squares. -/
+theorem isSemireal_mvFractionRing (n : ℕ) :
+    IsSemireal (FractionRing (MvPolynomial (Fin n) ℝ)) := by
+  refine isSemireal_iff_not_isSumSq_neg_one.mpr ?_
+  intro hsum
+  obtain ⟨m, f, hf⟩ := (isSumSq_iff_exists_fin).mp hsum
+  choose a b hb hrel using fun i : Fin m =>
+    denom_mvFraction (n := n) (f i)
+  set D : MvPolynomial (Fin n) ℝ := ∏ i, b i with hD
+  have hD0 : D ≠ 0 := by
+    intro h0
+    obtain ⟨i, _, hi0⟩ := Finset.prod_eq_zero_iff.mp h0
+    exact hb i hi0
+  set c : Fin m → MvPolynomial (Fin n) ℝ :=
+    fun i => ∏ j ∈ Finset.univ.erase i, b j with hc
+  have hcD : ∀ i : Fin m, c i * b i = D := by
+    intro i
+    calc c i * b i = (∏ j ∈ Finset.univ.erase i, b j) * b i := rfl
+      _ = D := by
+          rw [hD, Finset.prod_erase_mul Finset.univ b (Finset.mem_univ i)]
+  have hclear : algebraMap (MvPolynomial (Fin n) ℝ)
+        (FractionRing (MvPolynomial (Fin n) ℝ)) (-(D ^ 2)) =
+      algebraMap (MvPolynomial (Fin n) ℝ)
+        (FractionRing (MvPolynomial (Fin n) ℝ)) (∑ i, (a i * c i) ^ 2) := by
+    refine (IsFractionRing.injective (MvPolynomial (Fin n) ℝ)
+      (FractionRing (MvPolynomial (Fin n) ℝ))).eq_iff.mpr ?_
+    have hbmono : ∀ i : Fin m, algebraMap (MvPolynomial (Fin n) ℝ)
+        (FractionRing (MvPolynomial (Fin n) ℝ)) (b i) ≠ 0 := by
+      intro i hmap
+      exact hb i (IsFractionRing.injective (MvPolynomial (Fin n) ℝ)
+        (FractionRing (MvPolynomial (Fin n) ℝ)) (by simpa using hmap))
+    have hcmul : ∀ i : Fin m,
+        algebraMap (MvPolynomial (Fin n) ℝ)
+          (FractionRing (MvPolynomial (Fin n) ℝ)) (c i) *
+        algebraMap (MvPolynomial (Fin n) ℝ)
+          (FractionRing (MvPolynomial (Fin n) ℝ)) (b i) =
+        algebraMap (MvPolynomial (Fin n) ℝ)
+          (FractionRing (MvPolynomial (Fin n) ℝ)) D := by
+      intro i
+      rw [← map_mul, hcD i]
+    have key : ∀ i : Fin m,
+        algebraMap (MvPolynomial (Fin n) ℝ)
+          (FractionRing (MvPolynomial (Fin n) ℝ)) D ^ 2 * f i ^ 2 =
+        algebraMap (MvPolynomial (Fin n) ℝ)
+          (FractionRing (MvPolynomial (Fin n) ℝ)) ((a i * c i) ^ 2) := by
+      intro i
+      rw [show algebraMap (MvPolynomial (Fin n) ℝ)
+            (FractionRing (MvPolynomial (Fin n) ℝ)) D =
+          algebraMap (MvPolynomial (Fin n) ℝ)
+            (FractionRing (MvPolynomial (Fin n) ℝ)) (c i) *
+          algebraMap (MvPolynomial (Fin n) ℝ)
+            (FractionRing (MvPolynomial (Fin n) ℝ)) (b i) from (hcmul i).symm,
+        show algebraMap (MvPolynomial (Fin n) ℝ)
+            (FractionRing (MvPolynomial (Fin n) ℝ)) ((a i * c i) ^ 2) =
+          algebraMap (MvPolynomial (Fin n) ℝ)
+            (FractionRing (MvPolynomial (Fin n) ℝ)) (a i ^ 2) *
+          algebraMap (MvPolynomial (Fin n) ℝ)
+            (FractionRing (MvPolynomial (Fin n) ℝ)) (c i ^ 2) by
+          rw [map_pow, map_mul, map_pow, map_pow]
+          ring]
+      rw [map_pow, map_pow, ← hrel i]
+      ring_nf
+    have key_sum :
+        algebraMap (MvPolynomial (Fin n) ℝ)
+          (FractionRing (MvPolynomial (Fin n) ℝ)) D ^ 2 * ∑ i, f i ^ 2 =
+      algebraMap (MvPolynomial (Fin n) ℝ)
+        (FractionRing (MvPolynomial (Fin n) ℝ)) (∑ i, (a i * c i) ^ 2) := by
+      rw [Finset.mul_sum, map_sum]
+      exact Finset.sum_congr rfl (fun i _ => key i)
+    have h1 : algebraMap (MvPolynomial (Fin n) ℝ)
+        (FractionRing (MvPolynomial (Fin n) ℝ)) (-(D ^ 2)) =
+      algebraMap (MvPolynomial (Fin n) ℝ)
+        (FractionRing (MvPolynomial (Fin n) ℝ)) (∑ i, (a i * c i) ^ 2) := by
+      rw [map_neg, map_pow]
+      have h2 : -((algebraMap (MvPolynomial (Fin n) ℝ)
+            (FractionRing (MvPolynomial (Fin n) ℝ)) D)^2) =
+          (algebraMap (MvPolynomial (Fin n) ℝ)
+            (FractionRing (MvPolynomial (Fin n) ℝ)) D)^2 * ∑ i, f i ^ 2 := by
+        have hminus : (-1 : FractionRing (MvPolynomial (Fin n) ℝ)) = ∑ i, f i ^ 2 := hf
+        calc -((algebraMap (MvPolynomial (Fin n) ℝ)
+              (FractionRing (MvPolynomial (Fin n) ℝ)) D)^2) =
+            (algebraMap (MvPolynomial (Fin n) ℝ)
+              (FractionRing (MvPolynomial (Fin n) ℝ)) D)^2 *
+            (-1 : FractionRing (MvPolynomial (Fin n) ℝ)) := by ring
+          _ = (algebraMap (MvPolynomial (Fin n) ℝ)
+              (FractionRing (MvPolynomial (Fin n) ℝ)) D)^2 * ∑ i, f i ^ 2 := by
+              rw [hminus]
+      rw [h2, key_sum]
+    exact IsFractionRing.injective (MvPolynomial (Fin n) ℝ)
+      (FractionRing (MvPolynomial (Fin n) ℝ)) h1
+  have hA : -(D ^ 2) = ∑ i, (a i * c i) ^ 2 := by
+    exact IsFractionRing.injective (MvPolynomial (Fin n) ℝ)
+      (FractionRing (MvPolynomial (Fin n) ℝ))
+      (show algebraMap (MvPolynomial (Fin n) ℝ)
+        (FractionRing (MvPolynomial (Fin n) ℝ)) (-(D^2)) =
+      algebraMap (MvPolynomial (Fin n) ℝ)
+        (FractionRing (MvPolynomial (Fin n) ℝ)) (∑ i, (a i * c i)^2) from hclear)
+  obtain ⟨x, hx⟩ := exists_eval_ne_zero (p := D) hD0
+  have hev : (-1 : ℝ) * (MvPolynomial.eval x D) ^ 2 =
+      ∑ i, (MvPolynomial.eval x (a i * c i)) ^ 2 := by
+    have h1 : (MvPolynomial.eval x) (-(D : MvPolynomial (Fin n) ℝ)^2) =
+        (MvPolynomial.eval x) (∑ i, (a i * c i)^2) := by rw [hA]
+    simpa [sq_abs] using h1
+  have hnonneg : 0 ≤ ∑ i, (MvPolynomial.eval x (a i * c i)) ^ 2 :=
+    Finset.sum_nonneg (fun i _ => sq_nonneg _)
+  have hneg : (-1 : ℝ) * (MvPolynomial.eval x D) ^ 2 < 0 := by
+    apply mul_neg_of_neg_of_pos
+    · norm_num
+    · exact sq_pos_of_ne_zero hx
+  linarith
+
+end FractionRingField
+
 end Hilbert17thProblem
