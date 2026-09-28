@@ -62,6 +62,25 @@ theorem mem_preorderingOfClosure_insert (P : RingPreordering R) (a : R)
     a ∈ preorderingOfClosure P a h :=
   Subsemiring.subset_closure (Set.mem_insert _ _)
 
+/-- On a field, adjoining an element whose negative is not positive cannot create `-1`. -/
+theorem neg_one_notMem_closure_insert_of_neg_notMem
+    {F : Type*} [Field F] (P : RingPreordering F) {a : F}
+    (ha : -a ∉ P) :
+    -1 ∉ Subsemiring.closure (insert a (P : Set F)) := by
+  intro hc
+  obtain ⟨y, z, hy, hz, hx⟩ := mem_closure_insert_preordering P a hc
+  have hz0 : z ≠ 0 := by
+    rintro rfl
+    exact P.neg_one_notMem (by simp_all)
+  have hzinv : z⁻¹ ∈ P :=
+    RingPreordering.inv_mem (show z ∈ P from hz)
+  have hprod : y * z⁻¹ + z⁻¹ ∈ P :=
+    P.add_mem (P.mul_mem hy hzinv) hzinv
+  have hkey : -a = y * z⁻¹ + z⁻¹ := by
+    field_simp
+    linear_combination hx
+  exact ha (hkey ▸ hprod)
+
 /-- If `- (x*y)` is nonnegative in a preordering, adjoining either factor cannot make `-1`
 nonnegative in both generated preorderings. -/
 theorem neg_one_notMem_closure_insert_or
@@ -165,6 +184,30 @@ theorem isOrdering_of_maximal_preordering
   rcases hab with ha | hb
   · exact Or.inl ((hmax.2 (le_trans hPO hOQ) hOQ) ha)
   · exact Or.inr ((hmax.2 (le_trans hPO hOQ) hOQ) hb)
+
+/-- Every preordering on a field extends to a maximal preordering containing `a` whenever
+`-a ∉ P`. The maximality is among preorderings above the generated preordering. -/
+theorem exists_maximal_preordering_and_mem
+    {F : Type*} [Field F] (P : RingPreordering F) {a : F}
+    (ha : -a ∉ P) :
+    ∃ O : RingPreordering F, P ≤ O ∧
+      Maximal (fun Q => preorderingOfClosure P a
+        (neg_one_notMem_closure_insert_of_neg_notMem P ha) ≤ Q) O ∧ a ∈ O := by
+  have h := neg_one_notMem_closure_insert_of_neg_notMem P ha
+  obtain ⟨Q, hPQ, hQmax⟩ := exists_maximal_preordering (preorderingOfClosure P a h)
+  exact ⟨Q, le_trans (le_preorderingOfClosure P a h) hPQ, hQmax,
+    hPQ (mem_preorderingOfClosure_insert P a h)⟩
+
+/-- Every preordering on a field extends to an ordering containing `a` whenever `-a ∉ P`. -/
+theorem exists_isOrdering_and_mem
+    {F : Type*} [Field F] (P : RingPreordering F) {a : F}
+    (ha : -a ∉ P) :
+    ∃ O : RingPreordering F, P ≤ O ∧ O.IsOrdering ∧ a ∈ O := by
+  have h := neg_one_notMem_closure_insert_of_neg_notMem P ha
+  obtain ⟨Q, hPQ, hQmax⟩ := exists_maximal_preordering (preorderingOfClosure P a h)
+  exact ⟨Q, le_trans (le_preorderingOfClosure P a h) hPQ,
+    isOrdering_of_maximal_preordering hPQ hQmax,
+    hPQ (mem_preorderingOfClosure_insert P a h)⟩
 
 end
 
