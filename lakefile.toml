@@ -21,3 +21,4 @@ name = "Hilbert17thProblem"
 name = "LeanArchitect"
 git = "https://github.com/hanwenzhu/LeanArchitect.git"
 rev = "v4.28.0"
+
